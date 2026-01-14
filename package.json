@@ -1,0 +1,28 @@
+{
+  "name": "craft-cli",
+  "version": "0.1.0",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "craft": "src/index.ts",
+    "craft-cli": "src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "format": "biome format .",
+    "lint": "biome lint .",
+    "check": "biome check ."
+  },
+  "dependencies": {
+    "cac": "^6.7.14"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.11",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
