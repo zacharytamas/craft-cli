@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { toArray } from "./parsing";
 import type { QueryValue, RequestConfig, ResolvedOptions } from "./types";
 
@@ -77,7 +78,12 @@ export async function resolveBody(
     throw new Error("Request body is required.");
   }
 
-  const bodyText = data !== undefined ? String(data) : await readFileText(String(dataFile));
+  const bodyText =
+    data === "-"
+      ? await readStdinText()
+      : data !== undefined
+        ? String(data)
+        : await readFileText(String(dataFile));
   const expectsJson = (contentType ?? "application/json").includes("json");
 
   if (expectsJson) {
@@ -133,9 +139,25 @@ function buildUrl(baseUrl: string, path: string, query?: Record<string, QueryVal
 
 async function readFileText(path: string): Promise<string> {
   try {
-    return await Bun.file(path).text();
+    return await readFile(path, "utf8");
   } catch (error) {
     throw new Error(`Unable to read file: ${path}`);
+  }
+}
+
+async function readStdinText(): Promise<string> {
+  try {
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of process.stdin) {
+      if (typeof chunk === "string") {
+        chunks.push(Buffer.from(chunk));
+      } else {
+        chunks.push(chunk);
+      }
+    }
+    return Buffer.concat(chunks).toString("utf8");
+  } catch (error) {
+    throw new Error("Unable to read from stdin.");
   }
 }
 

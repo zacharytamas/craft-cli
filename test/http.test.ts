@@ -1,3 +1,5 @@
+import { unlink, writeFile } from "node:fs/promises";
+import { Readable } from "node:stream";
 import { describe, expect, test } from "bun:test";
 import { resolveBody, resolveDeleteBody, runRequest } from "../src/lib/http";
 import type { ResolvedOptions } from "../src/lib/types";
@@ -11,13 +13,43 @@ describe("http helpers", () => {
 
   test("resolveBody reads from file", async () => {
     const path = ".tmp-body.json";
-    await Bun.write(path, '{"ok":true}');
+    await writeFile(path, '{"ok":true}', "utf8");
 
     try {
       const body = await resolveBody(undefined, path, "application/json");
       expect(body).toBe('{"ok":true}');
     } finally {
-      await Bun.file(path).delete();
+      await unlink(path);
+    }
+  });
+
+  test("resolveBody reads from stdin when data is '-'", async () => {
+    const originalStdin = process.stdin;
+    const mockStdin = Readable.from(['{"from":"stdin"}']);
+
+    try {
+      Object.defineProperty(process, "stdin", {
+        value: mockStdin,
+        configurable: true,
+      });
+    } catch {
+      // @ts-expect-error - allow overriding stdin in tests
+      process.stdin = mockStdin;
+    }
+
+    try {
+      const body = await resolveBody("-", undefined, "application/json");
+      expect(body).toBe('{"from":"stdin"}');
+    } finally {
+      try {
+        Object.defineProperty(process, "stdin", {
+          value: originalStdin,
+          configurable: true,
+        });
+      } catch {
+        // @ts-expect-error - restore stdin in tests
+        process.stdin = originalStdin;
+      }
     }
   });
 

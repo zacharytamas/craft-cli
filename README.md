@@ -100,6 +100,12 @@ Insert blocks (JSON body):
 craft-cli blocks insert --body '{"blocks":[{"type":"text","markdown":"Hello"}],"position":{"position":"end","date":"today"}}'
 ```
 
+Insert blocks with JSON from stdin:
+
+```bash
+cat payload.json | craft-cli blocks insert --body -
+```
+
 Update blocks:
 
 ```bash
