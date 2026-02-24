@@ -1,4 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { Effect } from "effect";
+import { CliIoError, CliRequestError, CliValidationError } from "./errors";
 import { toArray } from "./parsing";
 import type { QueryValue, RequestConfig, ResolvedOptions } from "./types";
 
@@ -6,6 +8,15 @@ export async function runRequest(
   options: ResolvedOptions,
   request: RequestConfig,
 ): Promise<void> {
+  await Effect.runPromise(runRequestEffect(options, request));
+}
+
+export function runRequestEffect(
+  options: ResolvedOptions,
+  request: RequestConfig,
+): Effect.Effect<void, CliRequestError, never> {
+  return Effect.tryPromise({
+    try: async () => {
   const url = buildUrl(options.baseUrl, request.path, request.query);
   const headers = new Headers();
 
@@ -67,6 +78,12 @@ export async function runRequest(
   } finally {
     clearTimeout(timeout);
   }
+    },
+    catch: (error) =>
+      new CliRequestError({
+        message: error instanceof Error ? error.message : String(error),
+      }),
+  });
 }
 
 export async function resolveBody(
@@ -74,43 +91,74 @@ export async function resolveBody(
   dataFile: unknown,
   contentType?: string,
 ): Promise<string> {
+  return Effect.runPromise(resolveBodyEffect(data, dataFile, contentType));
+}
+
+export function resolveBodyEffect(
+  data: unknown,
+  dataFile: unknown,
+  contentType?: string,
+): Effect.Effect<string, CliValidationError | CliIoError, never> {
+  return Effect.gen(function* () {
   if (data === undefined && dataFile === undefined) {
-    throw new Error("Request body is required.");
+    return yield* Effect.fail(
+      new CliValidationError({
+        message: "Request body is required.",
+      }),
+    );
   }
 
   const bodyText =
     data === "-"
-      ? await readStdinText()
+      ? yield* readStdinTextEffect()
       : data !== undefined
         ? String(data)
-        : await readFileText(String(dataFile));
+        : yield* readFileTextEffect(String(dataFile));
   const expectsJson = (contentType ?? "application/json").includes("json");
 
   if (expectsJson) {
     try {
       JSON.parse(bodyText);
     } catch (error) {
-      throw new Error("Request body must be valid JSON when using application/json.");
+      return yield* Effect.fail(
+        new CliValidationError({
+          message: "Request body must be valid JSON when using application/json.",
+        }),
+      );
     }
   }
 
-  return bodyText;
+  return yield* Effect.succeed(bodyText);
+  });
 }
 
 export async function resolveDeleteBody(
   options: Record<string, unknown>,
   key: string,
 ): Promise<string> {
+  return Effect.runPromise(resolveDeleteBodyEffect(options, key));
+}
+
+export function resolveDeleteBodyEffect(
+  options: Record<string, unknown>,
+  key: string,
+): Effect.Effect<string, CliValidationError | CliIoError, never> {
+  return Effect.gen(function* () {
   if (options.body || options.bodyFile) {
-    return resolveBody(options.body, options.bodyFile, "application/json");
+    return yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
   }
 
   const ids = toArray(options.ids as string | string[] | undefined).map(String);
   if (ids.length === 0) {
-    throw new Error("Provide --ids or --body/--body-file.");
+    return yield* Effect.fail(
+      new CliValidationError({
+        message: "Provide --ids or --body/--body-file.",
+      }),
+    );
   }
 
-  return JSON.stringify({ [key]: ids });
+  return yield* Effect.succeed(JSON.stringify({ [key]: ids }));
+  });
 }
 
 function buildUrl(baseUrl: string, path: string, query?: Record<string, QueryValue>): string {
@@ -137,16 +185,19 @@ function buildUrl(baseUrl: string, path: string, query?: Record<string, QueryVal
   return url.toString();
 }
 
-async function readFileText(path: string): Promise<string> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (error) {
-    throw new Error(`Unable to read file: ${path}`);
-  }
+function readFileTextEffect(path: string): Effect.Effect<string, CliIoError, never> {
+  return Effect.tryPromise({
+    try: () => readFile(path, "utf8"),
+    catch: () =>
+      new CliIoError({
+        message: `Unable to read file: ${path}`,
+      }),
+  });
 }
 
-async function readStdinText(): Promise<string> {
-  try {
+function readStdinTextEffect(): Effect.Effect<string, CliIoError, never> {
+  return Effect.tryPromise({
+    try: async () => {
     const chunks: Uint8Array[] = [];
     for await (const chunk of process.stdin) {
       if (typeof chunk === "string") {
@@ -156,9 +207,12 @@ async function readStdinText(): Promise<string> {
       }
     }
     return Buffer.concat(chunks).toString("utf8");
-  } catch (error) {
-    throw new Error("Unable to read from stdin.");
-  }
+    },
+    catch: () =>
+      new CliIoError({
+        message: "Unable to read from stdin.",
+      }),
+  });
 }
 
 function safeJsonParse(value: string): unknown | undefined {

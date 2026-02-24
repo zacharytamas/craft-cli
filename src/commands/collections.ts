@@ -1,12 +1,18 @@
-import { withErrorHandler } from "../lib/cli";
-import { runRequest, resolveBody, resolveDeleteBody } from "../lib/http";
+import { Effect } from "effect";
+import { withEffectHandler } from "../lib/cli";
+import {
+  resolveBodyEffect,
+  resolveDeleteBodyEffect,
+  runRequestEffect,
+} from "../lib/http";
 import { parseNumber, requireConfirm } from "../lib/parsing";
 import type { CommandContext } from "../lib/cli";
 
 export function registerCollections(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
-  const action = <Args extends unknown[]>(handler: (...args: Args) => Promise<void>) =>
-    withErrorHandler(handler, handleError);
+  const action = <Args extends unknown[]>(
+    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+  ) => withEffectHandler(handler, handleError);
 
   cli
     .command("list", "List collections")
@@ -14,7 +20,8 @@ export function registerCollections(context: CommandContext): void {
     .option("--end-date <date>", "End date (YYYY-MM-DD or relative)")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
         const query: Record<string, string> = {};
         if (options.startDate) {
@@ -24,13 +31,14 @@ export function registerCollections(context: CommandContext): void {
           query.endDate = String(options.endDate);
         }
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "GET",
           path: "collections",
           query,
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -38,20 +46,22 @@ export function registerCollections(context: CommandContext): void {
     .option("--format <format>", "schema or json-schema-items")
     .option("--raw", "Print raw response")
     .action(
-      action(async (collectionId, options) => {
+      action((collectionId, options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
         const query: Record<string, string> = {};
         if (options.format) {
           query.format = String(options.format);
         }
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "GET",
           path: `collections/${collectionId}/schema`,
           query,
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -59,20 +69,22 @@ export function registerCollections(context: CommandContext): void {
     .option("--max-depth <n>", "Maximum depth")
     .option("--raw", "Print raw response")
     .action(
-      action(async (collectionId, options) => {
+      action((collectionId, options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
         const query: Record<string, string> = {};
         if (options.maxDepth !== undefined) {
           query.maxDepth = String(parseNumber(options.maxDepth, "max-depth"));
         }
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "GET",
           path: `collections/${collectionId}/items`,
           query,
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -81,11 +93,12 @@ export function registerCollections(context: CommandContext): void {
     .option("--body-file <path>", "Read request body from file")
     .option("--raw", "Print raw response")
     .action(
-      action(async (collectionId, options) => {
+      action((collectionId, options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = await resolveBody(options.body, options.bodyFile, "application/json");
+        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "POST",
           path: `collections/${collectionId}/items`,
           body,
@@ -93,6 +106,7 @@ export function registerCollections(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -101,11 +115,12 @@ export function registerCollections(context: CommandContext): void {
     .option("--body-file <path>", "Read request body from file")
     .option("--raw", "Print raw response")
     .action(
-      action(async (collectionId, options) => {
+      action((collectionId, options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = await resolveBody(options.body, options.bodyFile, "application/json");
+        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "PUT",
           path: `collections/${collectionId}/items`,
           body,
@@ -113,6 +128,7 @@ export function registerCollections(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -123,12 +139,13 @@ export function registerCollections(context: CommandContext): void {
     .option("--confirm", "Confirm deletion")
     .option("--raw", "Print raw response")
     .action(
-      action(async (collectionId, options) => {
+      action((collectionId, options) =>
+        Effect.gen(function* () {
         requireConfirm(options.confirm, "collections delete-items");
         const resolved = resolveOptions(options);
-        const body = await resolveDeleteBody(options, "idsToDelete");
+        const body = yield* resolveDeleteBodyEffect(options, "idsToDelete");
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "DELETE",
           path: `collections/${collectionId}/items`,
           body,
@@ -136,5 +153,6 @@ export function registerCollections(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { cac, type CAC } from "cac";
+import { Effect } from "effect";
 import pkg from "../package.json" with { type: "json" };
 import { registerBlocks } from "./commands/blocks";
 import { registerCollections } from "./commands/collections";
@@ -19,23 +20,28 @@ const GROUPS: Record<string, (context: ReturnType<typeof createCommandContext>) 
 
 const OPTIONS_WITH_VALUE = new Set(["--url", "--token"]);
 
-const argv = process.argv;
-const groupIndex = findGroupIndex(argv);
-const groupName = groupIndex === -1 ? undefined : argv[groupIndex];
+const program = Effect.sync(() => {
+  const argv = process.argv;
+  const groupIndex = findGroupIndex(argv);
+  const groupName = groupIndex === -1 ? undefined : argv[groupIndex];
+  const registerGroup = groupName ? GROUPS[groupName] : undefined;
 
-if (groupName && Object.hasOwn(GROUPS, groupName)) {
-  const subcli = createSubcommandCli(groupName, GROUPS[groupName]);
-  const subArgv = removeArgAt(argv, groupIndex);
+  if (groupName && registerGroup) {
+    const subcli = createSubcommandCli(groupName, registerGroup);
+    const subArgv = removeArgAt(argv, groupIndex);
 
-  if (!hasCommandArg(subArgv)) {
-    subcli.outputHelp();
+    if (!hasCommandArg(subArgv)) {
+      subcli.outputHelp();
+    } else {
+      subcli.parse(subArgv);
+    }
   } else {
-    subcli.parse(subArgv);
+    const cli = createMainCli();
+    cli.parse(argv);
   }
-} else {
-  const cli = createMainCli();
-  cli.parse(argv);
-}
+});
+
+await Effect.runPromise(program);
 
 function createMainCli(): CAC {
   const cli = cac(CLI_NAME);
@@ -92,6 +98,9 @@ function registerGroupPlaceholders(cli: CAC): void {
 function findGroupIndex(args: string[]): number {
   for (let index = 2; index < args.length; index += 1) {
     const arg = args[index];
+    if (!arg) {
+      continue;
+    }
     if (arg === "--") {
       return index + 1 < args.length ? index + 1 : -1;
     }
@@ -116,6 +125,9 @@ function removeArgAt(args: string[], index: number): string[] {
 function hasCommandArg(args: string[]): boolean {
   for (let index = 2; index < args.length; index += 1) {
     const arg = args[index];
+    if (!arg) {
+      continue;
+    }
     if (arg === "--") {
       return index + 1 < args.length;
     }

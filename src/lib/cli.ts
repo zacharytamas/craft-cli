@@ -1,5 +1,5 @@
 import type { CAC } from "cac";
-import { Effect } from "effect";
+import { Cause, Effect } from "effect";
 import { resolveOptions } from "./options";
 import type { GlobalOptions, ResolvedOptions } from "./types";
 
@@ -52,9 +52,9 @@ export function withEffectHandler<T extends unknown[]>(
   return async (...args: T) => {
     await Effect.runPromise(
       handler(...args).pipe(
-        Effect.catchAll((error) =>
+        Effect.catchAllCause((cause) =>
           Effect.sync(() => {
-            handleError(error);
+            handleError(Cause.squash(cause));
           }),
         ),
       ),

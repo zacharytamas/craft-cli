@@ -1,19 +1,26 @@
-import { withErrorHandler } from "../lib/cli";
-import { runRequest, resolveBody, resolveDeleteBody } from "../lib/http";
+import { Effect } from "effect";
+import { withEffectHandler } from "../lib/cli";
+import {
+  resolveBodyEffect,
+  resolveDeleteBodyEffect,
+  runRequestEffect,
+} from "../lib/http";
 import { requireConfirm } from "../lib/parsing";
 import type { CommandContext } from "../lib/cli";
 
 export function registerTasks(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
-  const action = <Args extends unknown[]>(handler: (...args: Args) => Promise<void>) =>
-    withErrorHandler(handler, handleError);
+  const action = <Args extends unknown[]>(
+    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+  ) => withEffectHandler(handler, handleError);
 
   cli
     .command("list", "List tasks by scope")
     .option("--scope <scope>", "active, upcoming, inbox, or logbook")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
         if (!options.scope) {
           throw new Error("--scope is required (active, upcoming, inbox, logbook).");
@@ -22,13 +29,14 @@ export function registerTasks(context: CommandContext): void {
           scope: String(options.scope),
         };
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "GET",
           path: "tasks",
           query,
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -37,11 +45,12 @@ export function registerTasks(context: CommandContext): void {
     .option("--body-file <path>", "Read request body from file")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = await resolveBody(options.body, options.bodyFile, "application/json");
+        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "POST",
           path: "tasks",
           body,
@@ -49,6 +58,7 @@ export function registerTasks(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -57,11 +67,12 @@ export function registerTasks(context: CommandContext): void {
     .option("--body-file <path>", "Read request body from file")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = await resolveBody(options.body, options.bodyFile, "application/json");
+        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "PUT",
           path: "tasks",
           body,
@@ -69,6 +80,7 @@ export function registerTasks(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -79,12 +91,13 @@ export function registerTasks(context: CommandContext): void {
     .option("--confirm", "Confirm deletion")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         requireConfirm(options.confirm, "tasks delete");
         const resolved = resolveOptions(options);
-        const body = await resolveDeleteBody(options, "idsToDelete");
+        const body = yield* resolveDeleteBodyEffect(options, "idsToDelete");
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "DELETE",
           path: "tasks",
           body,
@@ -92,5 +105,6 @@ export function registerTasks(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 }

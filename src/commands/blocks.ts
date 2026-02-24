@@ -1,5 +1,10 @@
-import { withErrorHandler } from "../lib/cli";
-import { runRequest, resolveBody, resolveDeleteBody } from "../lib/http";
+import { Effect } from "effect";
+import { withEffectHandler } from "../lib/cli";
+import {
+  resolveBodyEffect,
+  resolveDeleteBodyEffect,
+  runRequestEffect,
+} from "../lib/http";
 import {
   normalizeAccept,
   parseJson,
@@ -12,8 +17,9 @@ import type { QueryValue } from "../lib/types";
 
 export function registerBlocks(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
-  const action = <Args extends unknown[]>(handler: (...args: Args) => Promise<void>) =>
-    withErrorHandler(handler, handleError);
+  const action = <Args extends unknown[]>(
+    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+  ) => withEffectHandler(handler, handleError);
 
   cli
     .command("get", "Fetch blocks from daily notes")
@@ -24,7 +30,8 @@ export function registerBlocks(context: CommandContext): void {
     .option("--accept <type>", "Response format: json or markdown (default: json)")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
 
         if (options.date && options.id) {
@@ -47,7 +54,7 @@ export function registerBlocks(context: CommandContext): void {
 
         const acceptValue = normalizeAccept(options.accept);
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "GET",
           path: "blocks",
           query,
@@ -55,6 +62,7 @@ export function registerBlocks(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -66,7 +74,8 @@ export function registerBlocks(context: CommandContext): void {
     .option("--content-type <type>", "Override Content-Type")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
         const hasBody = options.body !== undefined || options.bodyFile !== undefined;
         const hasMarkdown = options.markdown !== undefined;
@@ -85,7 +94,7 @@ export function registerBlocks(context: CommandContext): void {
 
         if (hasBody) {
           contentType = contentType ?? "application/json";
-          body = await resolveBody(options.body, options.bodyFile, contentType);
+          body = yield* resolveBodyEffect(options.body, options.bodyFile, contentType);
         } else if (hasMarkdown) {
           contentType = contentType ?? "text/markdown";
           if (contentType.includes("json")) {
@@ -103,7 +112,7 @@ export function registerBlocks(context: CommandContext): void {
           }
         }
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "POST",
           path: "blocks",
           query,
@@ -112,6 +121,7 @@ export function registerBlocks(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -120,10 +130,11 @@ export function registerBlocks(context: CommandContext): void {
     .option("--body-file <path>", "Read request body from file")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = await resolveBody(options.body, options.bodyFile, "application/json");
-        await runRequest(resolved, {
+        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
+        yield* runRequestEffect(resolved, {
           method: "PUT",
           path: "blocks",
           body,
@@ -131,6 +142,7 @@ export function registerBlocks(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -141,11 +153,12 @@ export function registerBlocks(context: CommandContext): void {
     .option("--confirm", "Confirm deletion")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         requireConfirm(options.confirm, "blocks delete");
         const resolved = resolveOptions(options);
-        const body = await resolveDeleteBody(options, "blockIds");
-        await runRequest(resolved, {
+        const body = yield* resolveDeleteBodyEffect(options, "blockIds");
+        yield* runRequestEffect(resolved, {
           method: "DELETE",
           path: "blocks",
           body,
@@ -153,6 +166,7 @@ export function registerBlocks(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -163,12 +177,13 @@ export function registerBlocks(context: CommandContext): void {
     .option("--body-file <path>", "Read request body from file")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
         let body: string | undefined;
 
         if (options.body || options.bodyFile) {
-          body = await resolveBody(options.body, options.bodyFile, "application/json");
+          body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
         } else {
           const ids = toArray(options.ids).map(String);
           if (ids.length === 0) {
@@ -181,7 +196,7 @@ export function registerBlocks(context: CommandContext): void {
           body = JSON.stringify({ blockIds: ids, position });
         }
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "PUT",
           path: "blocks/move",
           body,
@@ -189,6 +204,7 @@ export function registerBlocks(context: CommandContext): void {
           raw: options.raw,
         });
       }),
+      ),
     );
 
   cli
@@ -199,7 +215,8 @@ export function registerBlocks(context: CommandContext): void {
     .option("--after <n>", "Blocks after the match")
     .option("--raw", "Print raw response")
     .action(
-      action(async (pattern, options) => {
+      action((pattern, options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
         const query: Record<string, string> = {
           pattern: String(pattern),
@@ -216,12 +233,13 @@ export function registerBlocks(context: CommandContext): void {
           query.afterBlockCount = String(parseNumber(options.after, "after"));
         }
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "GET",
           path: "blocks/search",
           query,
           raw: options.raw,
         });
       }),
+      ),
     );
 }

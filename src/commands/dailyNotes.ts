@@ -1,13 +1,15 @@
-import { withErrorHandler } from "../lib/cli";
-import { runRequest } from "../lib/http";
+import { Effect } from "effect";
+import { withEffectHandler } from "../lib/cli";
+import { runRequestEffect } from "../lib/http";
 import { toArray } from "../lib/parsing";
 import type { CommandContext } from "../lib/cli";
 import type { QueryValue } from "../lib/types";
 
 export function registerDailyNotes(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
-  const action = <Args extends unknown[]>(handler: (...args: Args) => Promise<void>) =>
-    withErrorHandler(handler, handleError);
+  const action = <Args extends unknown[]>(
+    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+  ) => withEffectHandler(handler, handleError);
 
   cli
     .command("search", "Search across daily notes")
@@ -18,7 +20,8 @@ export function registerDailyNotes(context: CommandContext): void {
     .option("--fetch-metadata", "Include metadata")
     .option("--raw", "Print raw response")
     .action(
-      action(async (options) => {
+      action((options) =>
+        Effect.gen(function* () {
         const resolved = resolveOptions(options);
         const query: Record<string, QueryValue> = {};
         const include = toArray(options.include).map(String);
@@ -40,12 +43,13 @@ export function registerDailyNotes(context: CommandContext): void {
           query.fetchMetadata = "true";
         }
 
-        await runRequest(resolved, {
+        yield* runRequestEffect(resolved, {
           method: "GET",
           path: "daily-notes/search",
           query,
           raw: options.raw,
         });
       }),
+      ),
     );
 }
