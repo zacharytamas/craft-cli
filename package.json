@@ -16,7 +16,8 @@
     "check": "biome check ."
   },
   "dependencies": {
-    "cac": "^6.7.14"
+    "cac": "^6.7.14",
+    "effect": "^3.19.19"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
