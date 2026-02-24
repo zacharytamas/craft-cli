@@ -1,5 +1,6 @@
 import type { CAC } from "cac";
 import { Cause, Effect } from "effect";
+import { CliHttpService, CliRuntimeLayer } from "./runtime";
 import { resolveOptions } from "./options";
 import type { GlobalOptions, ResolvedOptions } from "./types";
 
@@ -46,12 +47,13 @@ export function withErrorHandler<T extends unknown[]>(
 }
 
 export function withEffectHandler<T extends unknown[]>(
-  handler: (...args: T) => Effect.Effect<void, unknown, never>,
+  handler: (...args: T) => Effect.Effect<void, unknown, CliHttpService>,
   handleError: (error: unknown) => void,
 ): (...args: T) => Promise<void> {
   return async (...args: T) => {
     await Effect.runPromise(
       handler(...args).pipe(
+        Effect.provide(CliRuntimeLayer),
         Effect.catchAllCause((cause) =>
           Effect.sync(() => {
             handleError(Cause.squash(cause));

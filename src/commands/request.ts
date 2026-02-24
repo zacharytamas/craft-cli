@@ -1,13 +1,13 @@
 import { Effect } from "effect";
 import { withEffectHandler } from "../lib/cli";
-import { resolveBodyEffect, runRequestEffect } from "../lib/http";
+import { CliHttpService } from "../lib/runtime";
 import { parseKeyValueList, toArray } from "../lib/parsing";
 import type { CommandContext } from "../lib/cli";
 
 export function registerRequest(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
   const action = <Args extends unknown[]>(
-    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+    handler: (...args: Args) => Effect.Effect<void, unknown, CliHttpService>,
   ) => withEffectHandler(handler, handleError);
 
   cli
@@ -36,9 +36,9 @@ export function registerRequest(context: CommandContext): void {
         const body =
           options.data === undefined && options.dataFile === undefined
             ? undefined
-            : yield* resolveBodyEffect(options.data, options.dataFile, contentType);
+            : yield* CliHttpService.resolveBody(options.data, options.dataFile, contentType);
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: String(method),
           path: String(path),
           query,

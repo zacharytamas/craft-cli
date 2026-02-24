@@ -1,10 +1,6 @@
 import { Effect } from "effect";
 import { withEffectHandler } from "../lib/cli";
-import {
-  resolveBodyEffect,
-  resolveDeleteBodyEffect,
-  runRequestEffect,
-} from "../lib/http";
+import { CliHttpService } from "../lib/runtime";
 import {
   normalizeAccept,
   parseJson,
@@ -18,7 +14,7 @@ import type { QueryValue } from "../lib/types";
 export function registerBlocks(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
   const action = <Args extends unknown[]>(
-    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+    handler: (...args: Args) => Effect.Effect<void, unknown, CliHttpService>,
   ) => withEffectHandler(handler, handleError);
 
   cli
@@ -54,7 +50,7 @@ export function registerBlocks(context: CommandContext): void {
 
         const acceptValue = normalizeAccept(options.accept);
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "GET",
           path: "blocks",
           query,
@@ -94,7 +90,7 @@ export function registerBlocks(context: CommandContext): void {
 
         if (hasBody) {
           contentType = contentType ?? "application/json";
-          body = yield* resolveBodyEffect(options.body, options.bodyFile, contentType);
+          body = yield* CliHttpService.resolveBody(options.body, options.bodyFile, contentType);
         } else if (hasMarkdown) {
           contentType = contentType ?? "text/markdown";
           if (contentType.includes("json")) {
@@ -112,7 +108,7 @@ export function registerBlocks(context: CommandContext): void {
           }
         }
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "POST",
           path: "blocks",
           query,
@@ -133,8 +129,8 @@ export function registerBlocks(context: CommandContext): void {
       action((options) =>
         Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
-        yield* runRequestEffect(resolved, {
+        const body = yield* CliHttpService.resolveBody(options.body, options.bodyFile, "application/json");
+        yield* CliHttpService.runRequest(resolved, {
           method: "PUT",
           path: "blocks",
           body,
@@ -157,8 +153,8 @@ export function registerBlocks(context: CommandContext): void {
         Effect.gen(function* () {
         requireConfirm(options.confirm, "blocks delete");
         const resolved = resolveOptions(options);
-        const body = yield* resolveDeleteBodyEffect(options, "blockIds");
-        yield* runRequestEffect(resolved, {
+        const body = yield* CliHttpService.resolveDeleteBody(options, "blockIds");
+        yield* CliHttpService.runRequest(resolved, {
           method: "DELETE",
           path: "blocks",
           body,
@@ -183,7 +179,7 @@ export function registerBlocks(context: CommandContext): void {
         let body: string | undefined;
 
         if (options.body || options.bodyFile) {
-          body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
+          body = yield* CliHttpService.resolveBody(options.body, options.bodyFile, "application/json");
         } else {
           const ids = toArray(options.ids).map(String);
           if (ids.length === 0) {
@@ -196,7 +192,7 @@ export function registerBlocks(context: CommandContext): void {
           body = JSON.stringify({ blockIds: ids, position });
         }
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "PUT",
           path: "blocks/move",
           body,
@@ -233,7 +229,7 @@ export function registerBlocks(context: CommandContext): void {
           query.afterBlockCount = String(parseNumber(options.after, "after"));
         }
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "GET",
           path: "blocks/search",
           query,

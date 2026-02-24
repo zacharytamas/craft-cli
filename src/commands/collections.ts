@@ -1,17 +1,13 @@
 import { Effect } from "effect";
 import { withEffectHandler } from "../lib/cli";
-import {
-  resolveBodyEffect,
-  resolveDeleteBodyEffect,
-  runRequestEffect,
-} from "../lib/http";
 import { parseNumber, requireConfirm } from "../lib/parsing";
+import { CliHttpService } from "../lib/runtime";
 import type { CommandContext } from "../lib/cli";
 
 export function registerCollections(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
   const action = <Args extends unknown[]>(
-    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+    handler: (...args: Args) => Effect.Effect<void, unknown, CliHttpService>,
   ) => withEffectHandler(handler, handleError);
 
   cli
@@ -31,7 +27,7 @@ export function registerCollections(context: CommandContext): void {
           query.endDate = String(options.endDate);
         }
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "GET",
           path: "collections",
           query,
@@ -54,7 +50,7 @@ export function registerCollections(context: CommandContext): void {
           query.format = String(options.format);
         }
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "GET",
           path: `collections/${collectionId}/schema`,
           query,
@@ -77,7 +73,7 @@ export function registerCollections(context: CommandContext): void {
           query.maxDepth = String(parseNumber(options.maxDepth, "max-depth"));
         }
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "GET",
           path: `collections/${collectionId}/items`,
           query,
@@ -96,9 +92,9 @@ export function registerCollections(context: CommandContext): void {
       action((collectionId, options) =>
         Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
+        const body = yield* CliHttpService.resolveBody(options.body, options.bodyFile, "application/json");
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "POST",
           path: `collections/${collectionId}/items`,
           body,
@@ -118,9 +114,9 @@ export function registerCollections(context: CommandContext): void {
       action((collectionId, options) =>
         Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
+        const body = yield* CliHttpService.resolveBody(options.body, options.bodyFile, "application/json");
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "PUT",
           path: `collections/${collectionId}/items`,
           body,
@@ -143,9 +139,9 @@ export function registerCollections(context: CommandContext): void {
         Effect.gen(function* () {
         requireConfirm(options.confirm, "collections delete-items");
         const resolved = resolveOptions(options);
-        const body = yield* resolveDeleteBodyEffect(options, "idsToDelete");
+        const body = yield* CliHttpService.resolveDeleteBody(options, "idsToDelete");
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "DELETE",
           path: `collections/${collectionId}/items`,
           body,

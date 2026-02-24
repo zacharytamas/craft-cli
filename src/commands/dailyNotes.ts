@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { withEffectHandler } from "../lib/cli";
-import { runRequestEffect } from "../lib/http";
+import { CliHttpService } from "../lib/runtime";
 import { toArray } from "../lib/parsing";
 import type { CommandContext } from "../lib/cli";
 import type { QueryValue } from "../lib/types";
@@ -8,7 +8,7 @@ import type { QueryValue } from "../lib/types";
 export function registerDailyNotes(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
   const action = <Args extends unknown[]>(
-    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+    handler: (...args: Args) => Effect.Effect<void, unknown, CliHttpService>,
   ) => withEffectHandler(handler, handleError);
 
   cli
@@ -43,7 +43,7 @@ export function registerDailyNotes(context: CommandContext): void {
           query.fetchMetadata = "true";
         }
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "GET",
           path: "daily-notes/search",
           query,

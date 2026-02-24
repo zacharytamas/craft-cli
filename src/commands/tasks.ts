@@ -1,17 +1,13 @@
 import { Effect } from "effect";
 import { withEffectHandler } from "../lib/cli";
-import {
-  resolveBodyEffect,
-  resolveDeleteBodyEffect,
-  runRequestEffect,
-} from "../lib/http";
+import { CliHttpService } from "../lib/runtime";
 import { requireConfirm } from "../lib/parsing";
 import type { CommandContext } from "../lib/cli";
 
 export function registerTasks(context: CommandContext): void {
   const { cli, resolveOptions, handleError } = context;
   const action = <Args extends unknown[]>(
-    handler: (...args: Args) => Effect.Effect<void, unknown, never>,
+    handler: (...args: Args) => Effect.Effect<void, unknown, CliHttpService>,
   ) => withEffectHandler(handler, handleError);
 
   cli
@@ -29,7 +25,7 @@ export function registerTasks(context: CommandContext): void {
           scope: String(options.scope),
         };
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "GET",
           path: "tasks",
           query,
@@ -48,9 +44,9 @@ export function registerTasks(context: CommandContext): void {
       action((options) =>
         Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
+        const body = yield* CliHttpService.resolveBody(options.body, options.bodyFile, "application/json");
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "POST",
           path: "tasks",
           body,
@@ -70,9 +66,9 @@ export function registerTasks(context: CommandContext): void {
       action((options) =>
         Effect.gen(function* () {
         const resolved = resolveOptions(options);
-        const body = yield* resolveBodyEffect(options.body, options.bodyFile, "application/json");
+        const body = yield* CliHttpService.resolveBody(options.body, options.bodyFile, "application/json");
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "PUT",
           path: "tasks",
           body,
@@ -95,9 +91,9 @@ export function registerTasks(context: CommandContext): void {
         Effect.gen(function* () {
         requireConfirm(options.confirm, "tasks delete");
         const resolved = resolveOptions(options);
-        const body = yield* resolveDeleteBodyEffect(options, "idsToDelete");
+        const body = yield* CliHttpService.resolveDeleteBody(options, "idsToDelete");
 
-        yield* runRequestEffect(resolved, {
+        yield* CliHttpService.runRequest(resolved, {
           method: "DELETE",
           path: "tasks",
           body,
