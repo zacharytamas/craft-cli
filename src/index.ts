@@ -24,9 +24,8 @@ const program = Effect.sync(() => {
   const argv = process.argv;
   const groupIndex = findGroupIndex(argv);
   const groupName = groupIndex === -1 ? undefined : argv[groupIndex];
-  const registerGroup = groupName ? GROUPS[groupName] : undefined;
-
-  if (groupName && registerGroup) {
+  if (groupName && Object.hasOwn(GROUPS, groupName)) {
+    const registerGroup = GROUPS[groupName]!;
     const subcli = createSubcommandCli(groupName, registerGroup);
     const subArgv = removeArgAt(argv, groupIndex);
 

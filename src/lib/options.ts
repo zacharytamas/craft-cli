@@ -5,29 +5,32 @@ import type { GlobalOptions, ResolvedOptions } from "./types";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export function resolveOptions(options: GlobalOptions): ResolvedOptions {
-  return Effect.runSync(resolveOptionsEffect(options));
-}
-
-export function resolveOptionsEffect(
-  options: GlobalOptions,
-): Effect.Effect<ResolvedOptions, CliValidationError, never> {
   const baseUrlRaw = options.url ?? process.env.CRAFT_API_URL;
   if (!baseUrlRaw) {
-    return Effect.fail(
-      new CliValidationError({
-        message:
-          "Missing API base URL. Provide --url or set CRAFT_API_URL (e.g. https://connect.craft.do/links/<share-id>/api/v1).",
-      }),
+    throw new Error(
+      "Missing API base URL. Provide --url or set CRAFT_API_URL (e.g. https://connect.craft.do/links/<share-id>/api/v1).",
     );
   }
 
   const token = options.token ?? process.env.CRAFT_API_TOKEN;
   const timeoutMs = DEFAULT_TIMEOUT_MS;
 
-  return Effect.succeed({
+  return {
     baseUrl: normalizeBaseUrl(String(baseUrlRaw)),
     token: token ? String(token) : undefined,
     timeoutMs,
+  };
+}
+
+export function resolveOptionsEffect(
+  options: GlobalOptions,
+): Effect.Effect<ResolvedOptions, CliValidationError, never> {
+  return Effect.try({
+    try: () => resolveOptions(options),
+    catch: (error) =>
+      new CliValidationError({
+        message: error instanceof Error ? error.message : String(error),
+      }),
   });
 }
 

@@ -35,6 +35,13 @@ describe("resolveOptions", () => {
   });
 
   test("throws when base URL is missing", () => {
-    expect(() => resolveOptions({})).toThrow("Missing API base URL");
+    try {
+      resolveOptions({});
+      throw new Error("Expected resolveOptions to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("Missing API base URL");
+      expect((error as Error).message).not.toContain("FiberFailure");
+    }
   });
 });
