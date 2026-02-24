@@ -12,14 +12,18 @@ export type CommandContext = {
 
 export function createCommandContext(cli: CAC): CommandContext {
   const cliWithOptions = cli as CAC & {
-    opts: <T>() => T;
+    options?: unknown;
   };
 
   return {
     cli,
     resolveOptions(options) {
+      const globalOptions =
+        cliWithOptions.options && typeof cliWithOptions.options === "object"
+          ? (cliWithOptions.options as GlobalOptions)
+          : ({} as GlobalOptions);
       const merged: GlobalOptions = {
-        ...cliWithOptions.opts<GlobalOptions>(),
+        ...globalOptions,
         ...options,
       };
       return resolveOptions(merged);
